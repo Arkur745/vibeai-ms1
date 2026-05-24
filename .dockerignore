@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+
+aimlenv/
+venv/
+
+mlruns/
+.dvc/
+.dvc/cache/
+
+.git/
+.gitignore
+
+data/raw/
+
+temp_uploads/

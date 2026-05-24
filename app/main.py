@@ -2,13 +2,33 @@ from fastapi import FastAPI, UploadFile, File
 from pathlib import Path
 import shutil
 import uuid
-
-from app.inference import predict_emotion
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Histogram
+import time
+from app.tasks import process_audio_task
 
 app = FastAPI(
     title="Audio Emotion Recognition API"
 )
+Instrumentator().instrument(app).expose(app)
+# ---------------------------------
+# Custom ML Metrics
+# ---------------------------------
 
+INFERENCE_REQUESTS = Counter(
+    "inference_requests_total",
+    "Total number of inference requests"
+)
+
+INFERENCE_FAILURES = Counter(
+    "inference_failures_total",
+    "Total number of failed inference requests"
+)
+
+INFERENCE_DURATION = Histogram(
+    "inference_duration_seconds",
+    "Inference latency in seconds"
+)
 
 UPLOAD_DIR = Path("temp_uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -27,35 +47,81 @@ async def predict_audio(
     file: UploadFile = File(...)
 ):
 
-    # ---------------------------------
-    # Save Uploaded File
-    # ---------------------------------
+    start_time = time.time()
 
-    unique_name = f"{uuid.uuid4()}.mp3"
+    INFERENCE_REQUESTS.inc()
 
-    temp_path = UPLOAD_DIR / unique_name
+    try:
 
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
+        # ---------------------------------
+        # Save Uploaded File
+        # ---------------------------------
+
+        unique_name = f"{uuid.uuid4()}.mp3"
+
+        temp_path = UPLOAD_DIR / unique_name
+
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
+
+        # ---------------------------------
+        # Submit Async Task
+        # ---------------------------------
+
+        task = process_audio_task.delay(
+            str(temp_path)
         )
 
-    # ---------------------------------
-    # Run Inference
-    # ---------------------------------
+        duration = time.time() - start_time
 
-    prediction = predict_emotion(
-        temp_path
-    )
+        INFERENCE_DURATION.observe(duration)
 
-    # ---------------------------------
-    # Cleanup
-    # ---------------------------------
+        return {
+            "message": "Inference task submitted",
+            "task_id": task.id,
+            "filename": file.filename,
+            "request_time_seconds": round(duration, 4)
+        }
 
-    temp_path.unlink(missing_ok=True)
+    except Exception as e:
 
-    return {
-        "filename": file.filename,
-        "prediction": prediction
-    }
+        INFERENCE_FAILURES.inc()
+
+        return {
+            "error": str(e)
+        }
+
+
+@app.get("/result/{task_id}")
+async def get_result(task_id: str):
+
+    task = process_audio_task.AsyncResult(task_id)
+
+    if task.state == "PENDING":
+
+        return {
+            "status": "PENDING"
+        }
+
+    elif task.state == "SUCCESS":
+
+        return {
+            "status": "SUCCESS",
+            "result": task.result
+        }
+
+    elif task.state == "FAILURE":
+
+        return {
+            "status": "FAILURE",
+            "error": str(task.result)
+        }
+
+    else:
+
+        return {
+            "status": task.state
+        }
