@@ -13,7 +13,12 @@ OUTPUT_PATH = Path("data/features/deam_features.csv")
 
 def extract_features(audio_path):
 
+    # Load first 30 seconds
     y, sr = librosa.load(audio_path, duration=30)
+
+    # Validate audio length
+    if len(y) < sr * 5:
+        raise ValueError("Audio too short")
 
     # -----------------------------
     # MFCC
@@ -55,14 +60,21 @@ def extract_features(audio_path):
 
     feature_dict = {}
 
-    # MFCC features
+    # -----------------------------
+    # Store MFCC Features
+    # -----------------------------
     for i, value in enumerate(mfcc_mean):
         feature_dict[f"mfcc_{i+1}"] = value
 
-    # Chroma features
+    # -----------------------------
+    # Store Chroma Features
+    # -----------------------------
     for i, value in enumerate(chroma_mean):
         feature_dict[f"chroma_{i+1}"] = value
 
+    # -----------------------------
+    # Store Additional Features
+    # -----------------------------
     feature_dict["spectral_centroid"] = centroid_mean
     feature_dict["zero_crossing_rate"] = zcr_mean
 
@@ -77,12 +89,20 @@ def main():
 
     with mlflow.start_run(run_name="feature_extraction_pipeline"):
 
-        for _, row in tqdm(metadata_df.iterrows(), total=len(metadata_df)):
+        failed_count = 0
+
+        for _, row in tqdm(
+            metadata_df.iterrows(),
+            total=len(metadata_df)
+        ):
 
             try:
 
-                features = extract_features(row["audio_path"])
+                features = extract_features(
+                    row["audio_path"]
+                )
 
+                # Add labels
                 features["song_id"] = row["song_id"]
                 features["valence"] = row["valence"]
                 features["arousal"] = row["arousal"]
@@ -90,18 +110,38 @@ def main():
                 records.append(features)
 
             except Exception as e:
+
+                failed_count += 1
+
                 print(f"\nFailed: {row['audio_path']}")
                 print(e)
 
+        # --------------------------------
+        # Build DataFrame
+        # --------------------------------
         features_df = pd.DataFrame(records)
 
-        OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        OUTPUT_PATH.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
-        features_df.to_csv(OUTPUT_PATH, index=False)
+        features_df.to_csv(
+            OUTPUT_PATH,
+            index=False
+        )
 
+        # --------------------------------
+        # MLflow Logging
+        # --------------------------------
         mlflow.log_metric(
             "processed_samples",
             len(features_df)
+        )
+
+        mlflow.log_metric(
+            "failed_samples",
+            failed_count
         )
 
         mlflow.log_param(
@@ -109,10 +149,16 @@ def main():
             len(features_df.columns)
         )
 
+        # --------------------------------
+        # Console Output
+        # --------------------------------
         print("\nFeature Dataset Summary")
         print("----------------------------")
 
         print(features_df.head())
+
+        print(f"\nProcessed Samples: {len(features_df)}")
+        print(f"Failed Samples: {failed_count}")
 
         print(f"\nSaved feature dataset to:")
         print(OUTPUT_PATH)
