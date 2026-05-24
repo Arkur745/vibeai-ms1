@@ -31,3 +31,4 @@ data/features/
 
 # Environment variables
 .env
+/models
