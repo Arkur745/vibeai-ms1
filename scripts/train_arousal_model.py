@@ -15,6 +15,10 @@ from sklearn.metrics import (
 import joblib
 
 
+from app.ml.mood_mapping import (
+    get_mood_mapping_version
+)
+
 DATA_PATH = Path("data/features/deam_features.csv")
 
 MODEL_OUTPUT = Path("models/arousal_model.pkl")
@@ -66,6 +70,18 @@ def main():
     with mlflow.start_run(
         run_name="random_forest_arousal"
     ):
+        mlflow.log_param(
+            "mood_mapping_version",
+            get_mood_mapping_version()
+        )
+        mlflow.log_param(
+            "feature_dataset",
+            "deam_features_v1"
+        )
+        mlflow.log_param(
+            "model_type",
+            "RandomForestRegressor"
+        )
 
         model = RandomForestRegressor(
             n_estimators=200,

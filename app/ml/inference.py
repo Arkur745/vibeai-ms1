@@ -2,6 +2,7 @@ import joblib
 import librosa
 import numpy as np
 import pandas as pd
+from app.ml.mood_mapping import classify_mood
 
 from app.core.config import (
     VALENCE_MODEL_PATH,
@@ -101,11 +102,23 @@ def predict_emotion(audio_path):
 
     arousal = arousal_model.predict(X)[0]
 
-    result = {
-        "valence": round(float(valence), 3),
-        "arousal": round(float(arousal), 3)
-    }
+    mood_data = classify_mood(
+        float(valence),
+        float(arousal)
+    )
 
+
+    result = {
+    
+        "valence": round(float(valence), 3),
+    
+        "arousal": round(float(arousal), 3),
+    
+        "mood": mood_data["mood"],
+    
+        "vibe": mood_data["vibe"]
+    }
+    
     return result
 
 
