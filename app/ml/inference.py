@@ -3,15 +3,9 @@ import librosa
 import numpy as np
 import pandas as pd
 
-from pathlib import Path
-
-
-VALENCE_MODEL_PATH = Path(
-    "models/valence_model.pkl"
-)
-
-AROUSAL_MODEL_PATH = Path(
-    "models/arousal_model.pkl"
+from app.core.config import (
+    VALENCE_MODEL_PATH,
+    AROUSAL_MODEL_PATH
 )
 
 
