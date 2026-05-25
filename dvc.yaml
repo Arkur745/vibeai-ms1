@@ -1,0 +1,37 @@
+stages:
+
+  build_genre_dataset:
+
+    cmd: python -m scripts.build_genre_dataset
+
+    deps:
+      - scripts/build_genre_dataset.py
+      - data/raw/gtzan
+
+    outs:
+      - data/processed/gtzan_metadata.csv
+
+
+  build_genre_features:
+
+    cmd: python -m scripts.build_genre_features
+
+    deps:
+      - scripts/build_genre_features.py
+      - app/ml/inference.py
+      - data/processed/gtzan_metadata.csv
+
+    outs:
+      - data/features/gtzan_features_v1.csv
+
+
+  train_genre_xgboost:
+
+    cmd: python -m scripts.train_xgboost_genre
+
+    deps:
+      - scripts/train_xgboost_genre.py
+      - data/features/gtzan_features_v1.csv
+
+    outs:
+      - models/xgboost_genre_classifier_v1.pkl

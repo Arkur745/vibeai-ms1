@@ -2,13 +2,18 @@ import joblib
 import librosa
 import numpy as np
 import pandas as pd
+import shap
+
+from app.ml.explanation_engine import (
+    generate_explanation
+)
 from app.ml.mood_mapping import classify_mood
 
 from app.core.config import (
     VALENCE_MODEL_PATH,
-    AROUSAL_MODEL_PATH
+    AROUSAL_MODEL_PATH,
+    GENRE_MODEL_PATH
 )
-
 
 # ---------------------------------
 # Load Models
@@ -24,6 +29,21 @@ arousal_model = joblib.load(
     AROUSAL_MODEL_PATH
 )
 
+genre_bundle = joblib.load(
+    GENRE_MODEL_PATH
+)
+
+genre_model = genre_bundle["model"]
+
+genre_encoder = genre_bundle["label_encoder"]
+
+# ---------------------------------
+# SHAP Explainer
+# ---------------------------------
+
+arousal_explainer = shap.TreeExplainer(
+    arousal_model
+)
 
 # ---------------------------------
 # Feature Extraction
@@ -33,7 +53,7 @@ def extract_features(audio_path):
 
     y, sr = librosa.load(
         audio_path,
-        duration=30
+       
     )
 
     # ---------------------------------
@@ -115,6 +135,22 @@ def extract_features(audio_path):
     )
 
     onset_mean = np.mean(onset_env)
+    # ---------------------------------
+    # Tempo
+    # ---------------------------------
+
+    tempo, _ = librosa.beat.beat_track(
+        y=y,
+        sr=sr
+    )
+
+    # ---------------------------------
+    # Normalize Double Tempo Issue
+    # ---------------------------------
+
+    if tempo > 180:
+
+        tempo = tempo / 2
 
     # ---------------------------------
     # Harmonic / Percussive Separation
@@ -179,6 +215,8 @@ def extract_features(audio_path):
     feature_dict["harmonic_energy"] = harmonic_energy
 
     feature_dict["percussive_energy"] = percussive_energy
+    
+    feature_dict["tempo"] = float(tempo)
 
     # ---------------------------------
     # Tonnetz Features
@@ -203,30 +241,84 @@ def predict_emotion(audio_path):
     features = extract_features(
         audio_path
     )
+    tempo = features["tempo"]
 
-    X = pd.DataFrame([features])
+    model_features = features.copy()
+
+
+    del model_features["tempo"]
+
+    X = pd.DataFrame([model_features])
+    # ---------------------------------
+    # SHAP Explanation
+    # ---------------------------------
+
+
+    shap_values = arousal_explainer.shap_values(
+        X
+    )
 
     valence = valence_model.predict(X)[0]
 
     arousal = arousal_model.predict(X)[0]
 
+
+    genre_prediction = genre_model.predict(X)[0]
+
+    genre = genre_encoder.inverse_transform(
+        [genre_prediction]
+    )[0]
+    
     mood_data = classify_mood(
         float(valence),
         float(arousal)
     )
+    # ---------------------------------
+    # SHAP Contribution Analysis
+    # ---------------------------------
 
+    contributions = pd.DataFrame({
+
+        "feature": X.columns,
+
+        "shap_value": shap_values[0]
+    })
+
+    contributions["abs_value"] = (
+        contributions["shap_value"].abs()
+    )
+
+    contributions = contributions.sort_values(
+
+        by="abs_value",
+
+        ascending=False
+    )
+
+    # ---------------------------------
+    # Human Readable Explanations
+    # ---------------------------------
+
+    explanations = generate_explanation(
+        contributions
+    )
 
     result = {
-    
+
+        "genre": genre,
+
         "valence": round(float(valence), 3),
-    
+
         "arousal": round(float(arousal), 3),
-    
+
         "mood": mood_data["mood"],
-    
-        "vibe": mood_data["vibe"]
+
+        "vibe": mood_data["vibe"],
+
+        "explanations": explanations,
+        "tempo": round(float(tempo), 2),
     }
-    
+
     return result
 
 

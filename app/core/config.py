@@ -19,9 +19,9 @@ TEMP_UPLOAD_DIR = BASE_DIR / "temp_uploads"
 # Model Paths
 # ---------------------------------
 
-VALENCE_MODEL_PATH = MODELS_DIR / "valence_model.pkl"
+VALENCE_MODEL_PATH = "models/xgboost_valence_v2.pkl"
 
-AROUSAL_MODEL_PATH = MODELS_DIR / "arousal_model.pkl"
+AROUSAL_MODEL_PATH = "models/xgboost_arousal_v2.pkl"
 
 
 # ---------------------------------
@@ -52,3 +52,4 @@ AWS_REGION = os.getenv(
 S3_BUCKET_NAME = os.getenv(
     "S3_BUCKET_NAME"
 )
+GENRE_MODEL_PATH = "models/xgboost_genre_classifier_v1.pkl"
