@@ -2,7 +2,7 @@ stages:
 
   build_genre_dataset:
 
-    cmd: python -m scripts.build_genre_dataset
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m scripts.build_genre_dataset
 
     deps:
       - scripts/build_genre_dataset.py
@@ -14,7 +14,7 @@ stages:
 
   build_genre_features:
 
-    cmd: python -m scripts.build_genre_features
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m scripts.build_genre_features
 
     deps:
       - scripts/build_genre_features.py
@@ -27,7 +27,7 @@ stages:
 
   train_genre_xgboost:
 
-    cmd: python -m scripts.train_xgboost_genre
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m scripts.train_xgboost_genre
 
     deps:
       - scripts/train_xgboost_genre.py
