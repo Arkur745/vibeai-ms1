@@ -32,3 +32,29 @@ data/features/
 # Environment variables
 .env
 /configs
+# Data
+data/raw/
+data/spectrograms/
+data/features/
+data/processed/
+
+# Models
+models/*.pth
+models/*.pkl
+
+# Uploads
+temp_uploads/
+
+# MLflow
+mlruns/
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db

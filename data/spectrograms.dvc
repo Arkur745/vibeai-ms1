@@ -1,0 +1,6 @@
+outs:
+- md5: fb382d7a4ff748c1c7fc942beccd9d71.dir
+  size: 81572151
+  nfiles: 999
+  hash: md5
+  path: spectrograms
