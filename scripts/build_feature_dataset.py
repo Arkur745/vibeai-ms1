@@ -8,7 +8,9 @@ import mlflow
 
 METADATA_PATH = Path("data/processed/deam_metadata.csv")
 
-OUTPUT_PATH = Path("data/features/deam_features.csv")
+OUTPUT_PATH = Path(
+    "data/features/deam_features_v2.csv"
+)
 
 
 def extract_features(audio_path):
@@ -57,7 +59,64 @@ def extract_features(audio_path):
     zcr = librosa.feature.zero_crossing_rate(y)
 
     zcr_mean = np.mean(zcr)
+    # ---------------------------------
+    # RMS Energy
+    # ---------------------------------
 
+
+    rms = librosa.feature.rms(y=y)
+
+    rms_mean = np.mean(rms)
+
+    # ---------------------------------
+    # Spectral Rolloff
+    # ---------------------------------
+
+    rolloff = librosa.feature.spectral_rolloff(
+        y=y,
+        sr=sr
+    )
+
+    rolloff_mean = np.mean(rolloff)
+
+    # ---------------------------------
+    # Onset Strength
+    # ---------------------------------
+
+    onset_env = librosa.onset.onset_strength(
+        y=y,
+        sr=sr
+    )
+
+    onset_mean = np.mean(onset_env)
+
+    # ---------------------------------
+    # Harmonic / Percussive Separation
+    # ---------------------------------
+
+    harmonic, percussive = librosa.effects.hpss(y)
+
+    harmonic_energy = np.mean(
+        np.abs(harmonic)
+    )
+
+    percussive_energy = np.mean(
+        np.abs(percussive)
+    )
+
+    # ---------------------------------
+    # Tonnetz
+    # ---------------------------------
+
+    tonnetz = librosa.feature.tonnetz(
+        y=harmonic,
+        sr=sr
+    )
+
+    tonnetz_mean = np.mean(
+        tonnetz,
+        axis=1
+    )
     feature_dict = {}
 
     # -----------------------------
@@ -78,6 +137,22 @@ def extract_features(audio_path):
     feature_dict["spectral_centroid"] = centroid_mean
     feature_dict["zero_crossing_rate"] = zcr_mean
 
+
+    feature_dict["rms_energy"] = rms_mean
+
+    feature_dict["spectral_rolloff"] = rolloff_mean
+
+    feature_dict["onset_strength"] = onset_mean
+
+    feature_dict["harmonic_energy"] = harmonic_energy
+
+    feature_dict["percussive_energy"] = percussive_energy
+
+
+    # Tonnetz Features
+    for i, value in enumerate(tonnetz_mean):
+
+        feature_dict[f"tonnetz_{i+1}"] = value
     return feature_dict
 
 
@@ -90,6 +165,10 @@ def main():
     with mlflow.start_run(run_name="feature_extraction_pipeline"):
 
         failed_count = 0
+        mlflow.log_param(
+            "feature_version",
+            "v2"
+        )
 
         for _, row in tqdm(
             metadata_df.iterrows(),

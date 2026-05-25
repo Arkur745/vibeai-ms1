@@ -13,13 +13,23 @@ from sklearn.metrics import (
 )
 
 import joblib
+
 from app.ml.mood_mapping import (
     get_mood_mapping_version
 )
 
-DATA_PATH = Path("data/features/deam_features.csv")
 
-MODEL_OUTPUT = Path("models/valence_model.pkl")
+# ---------------------------------
+# Paths
+# ---------------------------------
+
+DATA_PATH = Path(
+    "data/features/deam_features_v2.csv"
+)
+
+MODEL_OUTPUT = Path(
+    "models/random_forest_valence_v2.pkl"
+)
 
 
 def main():
@@ -66,20 +76,42 @@ def main():
     # ---------------------------------
 
     with mlflow.start_run(
-        run_name="random_forest_valence"
+        run_name="random_forest_valence_v2"
     ):
+
         mlflow.log_param(
             "mood_mapping_version",
             get_mood_mapping_version()
         )
+
         mlflow.log_param(
-            "feature_dataset",
-            "deam_features_v1"
+            "feature_version",
+            "v2"
         )
+
         mlflow.log_param(
             "model_type",
             "RandomForestRegressor"
         )
+
+        mlflow.log_param(
+            "target",
+            "valence"
+        )
+
+        mlflow.log_param(
+            "n_estimators",
+            200
+        )
+
+        mlflow.log_param(
+            "max_depth",
+            12
+        )
+
+        # ---------------------------------
+        # Model
+        # ---------------------------------
 
         model = RandomForestRegressor(
             n_estimators=200,
@@ -90,13 +122,18 @@ def main():
 
         print("\nTraining RandomForest...")
 
-        model.fit(X_train, y_train)
+        model.fit(
+            X_train,
+            y_train
+        )
 
         # ---------------------------------
         # Predictions
         # ---------------------------------
 
-        predictions = model.predict(X_test)
+        predictions = model.predict(
+            X_test
+        )
 
         mae = mean_absolute_error(
             y_test,
@@ -114,23 +151,8 @@ def main():
         )
 
         # ---------------------------------
-        # MLflow Logging
+        # MLflow Metrics
         # ---------------------------------
-
-        mlflow.log_param(
-            "model_type",
-            "RandomForestRegressor"
-        )
-
-        mlflow.log_param(
-            "n_estimators",
-            200
-        )
-
-        mlflow.log_param(
-            "max_depth",
-            12
-        )
 
         mlflow.log_metric(
             "MAE",
@@ -163,7 +185,7 @@ def main():
 
         mlflow.sklearn.log_model(
             model,
-            artifact_path="valence_model"
+            artifact_path="random_forest_valence_v2_model"
         )
 
         print("\nTraining Complete")
