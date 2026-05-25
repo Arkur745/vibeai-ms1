@@ -1,0 +1,5 @@
+outs:
+- md5: d459ebd75e8beb0699d656c023ef1e2d
+  size: 103147749
+  hash: md5
+  path: best_cnn_genre_classifier.pth

@@ -1,0 +1,66 @@
+schema: '2.0'
+stages:
+  build_genre_dataset:
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m 
+      scripts.build_genre_dataset
+    deps:
+    - path: data/raw/gtzan
+      hash: md5
+      md5: 93c37d996f5645354ebb96a940624b50.dir
+      size: 1323989016
+      nfiles: 1000
+    - path: scripts/build_genre_dataset.py
+      hash: md5
+      md5: d797ebaa84799fc78aada0fdcdf7a292
+      size: 922
+    outs:
+    - path: data/processed/gtzan_metadata.csv
+      hash: md5
+      md5: 7b591ab3b3a4aec09ca32eb2df941fe9
+      size: 45218
+  build_genre_features:
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m 
+      scripts.build_genre_features
+    deps:
+    - path: app/ml/inference.py
+      hash: md5
+      md5: 0abc1fd09593f1313d8b49e1e1237959
+      size: 6978
+    - path: data/processed/gtzan_metadata.csv
+      hash: md5
+      md5: 7b591ab3b3a4aec09ca32eb2df941fe9
+      size: 45218
+    - path: scripts/build_genre_features.py
+      hash: md5
+      md5: 1ee5e69973c38769e4e4f858ee08ae08
+      size: 1597
+    outs:
+    - path: data/features/gtzan_features_v1.csv
+      hash: md5
+      md5: 5aca47edf4966e2b53eb4f30101539e5
+      size: 507758
+  train_genre_xgboost:
+    cmd: C:\Users\atmar\anaconda3\envs\aimlenv\python.exe -m 
+      scripts.train_xgboost_genre
+    deps:
+    - path: data/features/gtzan_features_v1.csv
+      hash: md5
+      md5: 5aca47edf4966e2b53eb4f30101539e5
+      size: 507758
+    - path: params.yaml
+      hash: md5
+      md5: a275d5e971a1b842f5f63ab9fad68dc4
+      size: 126
+    - path: scripts/train_xgboost_genre.py
+      hash: md5
+      md5: 0241691eb7cfd1f860026f5c17bd3c1f
+      size: 5368
+    outs:
+    - path: metrics/genre_metrics.json
+      hash: md5
+      md5: 895261b949fe3ef303c59582f2fb2283
+      size: 27
+    - path: models/xgboost_genre_classifier_v1.pkl
+      hash: md5
+      md5: c2e9a343e0e12e98cfee0bf09362ebf9
+      size: 4967249

@@ -1,6 +1,8 @@
 import joblib
 import mlflow
 import mlflow.sklearn
+import yaml
+import json
 
 import pandas as pd
 
@@ -103,22 +105,30 @@ def main():
             "feature_version",
             "v1"
         )
+        # ---------------------------------
+        # Load Params
+        # ---------------------------------
 
+        with open("params.yaml", "r") as f:
+
+            params = yaml.safe_load(f)
+
+        model_params = params["genre_model"]
         # ---------------------------------
         # Model
         # ---------------------------------
 
         model = XGBClassifier(
 
-            n_estimators=400,
+            n_estimators=model_params["n_estimators"],
 
-            learning_rate=0.05,
+            learning_rate=model_params["learning_rate"],
 
-            max_depth=8,
+            max_depth=model_params["max_depth"],
 
-            subsample=0.8,
+            subsample=model_params["subsample"],
 
-            colsample_bytree=0.8,
+            colsample_bytree=model_params["colsample_bytree"],
 
             random_state=42,
 
@@ -144,6 +154,30 @@ def main():
             y_test,
             predictions
         )
+        # ---------------------------------
+        # Save Metrics
+        # ---------------------------------
+
+        metrics = {
+
+            "accuracy": float(accuracy)
+        }
+
+        Path("metrics").mkdir(
+
+            exist_ok=True
+        )
+
+        with open(
+            "metrics/genre_metrics.json",
+            "w"
+        ) as f:
+
+            json.dump(
+                metrics,
+                f,
+                indent=4
+            )
 
         # ---------------------------------
         # MLflow Metrics
@@ -226,3 +260,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+    

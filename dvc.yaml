@@ -32,6 +32,10 @@ stages:
     deps:
       - scripts/train_xgboost_genre.py
       - data/features/gtzan_features_v1.csv
+      - params.yaml
 
     outs:
       - models/xgboost_genre_classifier_v1.pkl
+
+    metrics:
+      - metrics/genre_metrics.json

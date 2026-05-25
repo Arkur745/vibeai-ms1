@@ -2,49 +2,116 @@ from fastapi import FastAPI, UploadFile, File
 from pathlib import Path
 import shutil
 import uuid
-from prometheus_fastapi_instrumentator import Instrumentator
-from prometheus_client import Counter, Histogram
 import time
-from app.workers.tasks import process_audio_task
-from app.core.storage import upload_file_to_s3
+
+from celery.result import AsyncResult
+
+from prometheus_fastapi_instrumentator import (
+    Instrumentator
+)
+
+from prometheus_client import (
+    Counter,
+    Histogram
+)
+
+from app.workers.tasks import (
+    process_audio_task
+)
+
+from app.core.storage import (
+    upload_file_to_s3
+)
+
+from app.schemas import (
+    TaskSubmitResponse,
+    TaskStatusResponse,
+    AnalysisResult
+)
+
+
+# ---------------------------------
+# FastAPI App
+# ---------------------------------
 
 app = FastAPI(
-    title="Audio Emotion Recognition API"
+
+    title="VibeAI Audio Intelligence API",
+
+    version="1.0.0"
 )
+
 Instrumentator().instrument(app).expose(app)
+
+
 # ---------------------------------
-# Custom ML Metrics
+# Custom Metrics
 # ---------------------------------
 
 INFERENCE_REQUESTS = Counter(
+
     "inference_requests_total",
+
     "Total number of inference requests"
 )
 
 INFERENCE_FAILURES = Counter(
+
     "inference_failures_total",
+
     "Total number of failed inference requests"
 )
 
 INFERENCE_DURATION = Histogram(
+
     "inference_duration_seconds",
+
     "Inference latency in seconds"
 )
 
-UPLOAD_DIR = Path("temp_uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
 
+# ---------------------------------
+# Upload Directory
+# ---------------------------------
+
+UPLOAD_DIR = Path(
+    "temp_uploads"
+)
+
+UPLOAD_DIR.mkdir(
+    exist_ok=True
+)
+
+
+# ---------------------------------
+# Root Endpoint
+# ---------------------------------
 
 @app.get("/")
 def root():
 
     return {
-        "message": "Audio Emotion API Running"
+
+        "service": "VibeAI Audio Intelligence API",
+
+        "status": "running",
+
+        "version": "1.0.0"
     }
 
 
-@app.post("/predict")
-async def predict_audio(
+# ---------------------------------
+# Analyze Audio
+# ---------------------------------
+
+@app.post(
+
+    "/api/v1/analyze",
+
+    response_model=TaskSubmitResponse
+)
+async def analyze_audio(
+
     file: UploadFile = File(...)
 ):
 
@@ -55,7 +122,7 @@ async def predict_audio(
     try:
 
         # ---------------------------------
-        # Save Uploaded File
+        # Save Upload Locally
         # ---------------------------------
 
         unique_name = f"{uuid.uuid4()}.mp3"
@@ -63,89 +130,140 @@ async def predict_audio(
         temp_path = UPLOAD_DIR / unique_name
 
         with open(temp_path, "wb") as buffer:
+
             shutil.copyfileobj(
+
                 file.file,
+
                 buffer
             )
 
         # ---------------------------------
-        # Submit Async Task
-        # ---------------------------------
-
-        # ---------------------------------
         # Upload To S3
         # ---------------------------------
-        
+
         s3_key = f"uploads/{unique_name}"
-        
+
         upload_file_to_s3(
+
             temp_path,
+
             s3_key
         )
-        
+
         # ---------------------------------
-        # Remove Local Upload
+        # Remove Temporary File
         # ---------------------------------
-        
+
         temp_path.unlink(
             missing_ok=True
         )
-        
+
         # ---------------------------------
-        # Submit Async Task
+        # Submit Celery Task
         # ---------------------------------
-        
+
         task = process_audio_task.delay(
             s3_key
         )
-        
+
+        # ---------------------------------
+        # Metrics
+        # ---------------------------------
+
         duration = time.time() - start_time
 
-        INFERENCE_DURATION.observe(duration)
+        INFERENCE_DURATION.observe(
+            duration
+        )
 
-        return {
-            "message": "Inference task submitted",
-            "task_id": task.id,
-            "filename": file.filename,
-            "request_time_seconds": round(duration, 4)
-        }
+        # ---------------------------------
+        # Response
+        # ---------------------------------
+
+        return TaskSubmitResponse(
+
+            task_id=task.id,
+
+            status="submitted"
+        )
 
     except Exception as e:
-    
+
         INFERENCE_FAILURES.inc()
 
         return {
+
             "error": str(e)
         }
-        
-        
-@app.get("/result/{task_id}")
+
+
+# ---------------------------------
+# Get Task Result
+# ---------------------------------
+
+@app.get(
+
+    "/api/v1/result/{task_id}",
+
+    response_model=TaskStatusResponse
+)
 async def get_result(task_id: str):
 
-    task = process_audio_task.AsyncResult(task_id)
+    task = AsyncResult(task_id)
+
+    # ---------------------------------
+    # Pending
+    # ---------------------------------
 
     if task.state == "PENDING":
 
-        return {
-            "status": "PENDING"
-        }
+        return TaskStatusResponse(
+
+            task_id=task_id,
+
+            status="pending"
+        )
+
+    # ---------------------------------
+    # Success
+    # ---------------------------------
 
     elif task.state == "SUCCESS":
 
-        return {
-            "status": "SUCCESS",
-            "result": task.result
-        }
+        result_data = AnalysisResult(
+            **task.result
+        )
+
+        return TaskStatusResponse(
+
+            task_id=task_id,
+
+            status="completed",
+
+            result=result_data
+        )
+
+    # ---------------------------------
+    # Failure
+    # ---------------------------------
 
     elif task.state == "FAILURE":
 
-        return {
-            "status": "FAILURE",
-            "error": str(task.result)
-        }
+        return TaskStatusResponse(
 
-    else:
+            task_id=task_id,
 
-        return {
-            "status": task.state
-        }
+            status="failed"
+        )
+
+    # ---------------------------------
+    # Other States
+    # ---------------------------------
+
+    return TaskStatusResponse(
+
+        task_id=task_id,
+
+        status=task.state.lower()
+    )

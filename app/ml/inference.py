@@ -32,7 +32,7 @@ arousal_model = joblib.load(
 genre_bundle = joblib.load(
     GENRE_MODEL_PATH
 )
-
+print(AROUSAL_MODEL_PATH)
 genre_model = genre_bundle["model"]
 
 genre_encoder = genre_bundle["label_encoder"]
@@ -241,50 +241,107 @@ def predict_emotion(audio_path):
     features = extract_features(
         audio_path
     )
-    tempo = features["tempo"]
 
-    model_features = features.copy()
+    # ---------------------------------
+    # Preserve Tempo For API Response
+    # ---------------------------------
 
+    tempo_value = features["tempo"]
 
-    del model_features["tempo"]
+    # ---------------------------------
+    # Emotion Model Features
+    # (without tempo)
+    # ---------------------------------
 
-    X = pd.DataFrame([model_features])
+    emotion_features = features.copy()
+
+    del emotion_features["tempo"]
+
+    X_emotion = pd.DataFrame(
+        [emotion_features]
+    )
+
+    # ---------------------------------
+    # Genre Model Features
+    # (with tempo)
+    # ---------------------------------
+
+    X_genre = pd.DataFrame(
+        [features]
+    )
+
+    # ---------------------------------
+    # Debug
+    # ---------------------------------
+
+    print("\nEmotion Features:")
+    print(X_emotion.columns.tolist())
+
+    print("\nEmotion Feature Count:")
+    print(len(X_emotion.columns))
+
+    print("\nGenre Features:")
+    print(X_genre.columns.tolist())
+
+    print("\nGenre Feature Count:")
+    print(len(X_genre.columns))
+
     # ---------------------------------
     # SHAP Explanation
     # ---------------------------------
 
-
     shap_values = arousal_explainer.shap_values(
-        X
+        X_emotion
     )
 
-    valence = valence_model.predict(X)[0]
+    # ---------------------------------
+    # Emotion Predictions
+    # ---------------------------------
 
-    arousal = arousal_model.predict(X)[0]
+    valence = valence_model.predict(
+        X_emotion
+    )[0]
 
+    arousal = arousal_model.predict(
+        X_emotion
+    )[0]
 
-    genre_prediction = genre_model.predict(X)[0]
+    # ---------------------------------
+    # Genre Prediction
+    # ---------------------------------
+
+    genre_prediction = genre_model.predict(
+        X_genre
+    )[0]
 
     genre = genre_encoder.inverse_transform(
         [genre_prediction]
     )[0]
-    
+
+    # ---------------------------------
+    # Mood Mapping
+    # ---------------------------------
+
     mood_data = classify_mood(
+
         float(valence),
+
         float(arousal)
     )
+
     # ---------------------------------
     # SHAP Contribution Analysis
     # ---------------------------------
 
     contributions = pd.DataFrame({
 
-        "feature": X.columns,
+        "feature": X_emotion.columns,
 
         "shap_value": shap_values[0]
     })
 
     contributions["abs_value"] = (
+
         contributions["shap_value"].abs()
     )
 
@@ -303,6 +360,10 @@ def predict_emotion(audio_path):
         contributions
     )
 
+    # ---------------------------------
+    # Final Response
+    # ---------------------------------
+
     result = {
 
         "genre": genre,
@@ -316,11 +377,11 @@ def predict_emotion(audio_path):
         "vibe": mood_data["vibe"],
 
         "explanations": explanations,
-        "tempo": round(float(tempo), 2),
+
+        "tempo": round(float(tempo_value), 2)
     }
 
     return result
-
 
 # ---------------------------------
 # CLI Testing
