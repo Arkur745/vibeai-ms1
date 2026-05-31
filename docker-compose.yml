@@ -1,9 +1,5 @@
-version: "3.9"
-
 services:
-
   redis:
-
     image: redis:7
 
     container_name: redis
@@ -11,9 +7,7 @@ services:
     ports:
       - "6379:6379"
 
-
   api:
-
     build: .
 
     container_name: vibeai-api
@@ -28,14 +22,18 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
+    volumes:
+      - ./temp_uploads:/app/temp_uploads
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
 
-
   worker:
-
     build: .
 
     container_name: vibeai-worker
@@ -47,15 +45,19 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
+    volumes:
+      - ./temp_uploads:/app/temp_uploads
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+
     command: >
-      celery -A app.workers.tasks
+      celery -A app.workers.celery_app
       worker
       --pool=solo
       --loglevel=info
 
-
   mlflow:
-
     image: ghcr.io/mlflow/mlflow:v2.12.1
 
     container_name: mlflow
@@ -67,9 +69,7 @@ services:
       mlflow ui
       --host 0.0.0.0
 
-
   prometheus:
-
     image: prom/prometheus
 
     container_name: prometheus
@@ -80,15 +80,13 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
 
-
   grafana:
-
     image: grafana/grafana
 
     container_name: grafana
 
     ports:
-      - "3000:3000"
+      - "3030:3000"
 
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin

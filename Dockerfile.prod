@@ -1,0 +1,65 @@
+# ==========================================
+# STAGE 1: Builder (Install Build Dependencies)
+# ==========================================
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+# Install system utilities needed for compiling packages (if any)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libsndfile1-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+# Install dependencies into a wheels directory
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ==========================================
+# STAGE 2: Runner (Production App Image)
+# ==========================================
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+# Install runtime library dependencies (e.g. libsndfile1 for audio operations, curl for healthchecks)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed python dependencies from builder
+COPY --from=builder /root/.local /home/vibeai/.local
+ENV PATH=/home/vibeai/.local/bin:$PATH
+
+# Create non-root system user and group
+RUN groupadd -g 10001 vibeai && \
+    useradd -u 10001 -g vibeai -d /home/vibeai -s /sbin/nologin -c "VibeAI Runner" vibeai && \
+    mkdir -p /home/vibeai && \
+    chown -R vibeai:vibeai /home/vibeai
+
+# Copy application source code
+COPY --chown=vibeai:vibeai . .
+
+# Setup persistent/transient folders with proper non-root ownership
+RUN mkdir -p /app/temp_uploads /app/artifacts /app/data /app/models && \
+    chown -R vibeai:vibeai /app/temp_uploads /app/artifacts /app/data /app/models && \
+    chmod 750 /app/temp_uploads /app/artifacts /app/data /app/models
+
+# Set runtime container environment configurations
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENV=production
+
+# Switch to non-root execution context
+USER vibeai
+
+EXPOSE 8000
+
+# Native healthcheck using curl
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,0 @@
-outs:
-- md5: eabfaf5c6bf0e3e4311bd79d27582b39
-  size: 103149525
-  hash: md5
-  path: cnn_genre_classifier.pth

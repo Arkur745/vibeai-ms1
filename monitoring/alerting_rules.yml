@@ -1,0 +1,38 @@
+groups:
+  - name: vibeai-alert-rules
+    rules:
+      # Alert when inference fails repeatedly over a 5-minute window (actionable API issue)
+      - alert: HighInferenceFailureRate
+        expr: |
+          (sum(rate(vibeai_inference_failures_total[5m])) / sum(rate(vibeai_inference_requests_total[5m]) + 0.0001)) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          tier: api
+        annotations:
+          summary: "VibeAI API Inference Failure Rate is High (exceeds 5%)"
+          description: "The audio emotion microservice is failing more than 5% of incoming tasks over the last 5 minutes. Current rate is {{ $value | printf \"%.2f\" }}%."
+
+      # Alert when processing latency degrades significantly (actionable performance regression)
+      - alert: SlowInferenceLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(vibeai_total_task_duration_seconds_bucket[5m])) by (le)) > 15
+        for: 10m
+        labels:
+          severity: warning
+          tier: performance
+        annotations:
+          summary: "VibeAI 95th Percentile Latency is slow (> 15 seconds)"
+          description: "95% of asynchronous audio inference tasks are taking more than 15 seconds to complete. Current P95 latency is {{ $value | printf \"%.2f\" }} seconds."
+
+      # Alert when CUDA GPU memory is exhausted (actionable system capacity issue)
+      - alert: GpuOutOfMemory
+        expr: |
+          (vibeai_gpu_memory_allocated_mb / vibeai_gpu_memory_total_mb) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          tier: infrastructure
+        annotations:
+          summary: "VibeAI GPU memory allocation exceeds 95%"
+          description: "CUDA memory allocation inside the worker service is critically high, exceeding 95% of available capacity. Current allocation is {{ $value | printf \"%.2f\" }}%."

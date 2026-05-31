@@ -1,18 +1,12 @@
 import boto3
 
-from app.core.config import (
-    AWS_ACCESS_KEY_ID,
-    AWS_SECRET_ACCESS_KEY,
-    AWS_REGION
-)
+from app.core.config import settings
 
 
 s3_client = boto3.client(
     "s3",
-
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-
-    region_name=AWS_REGION
+    aws_access_key_id=settings.aws_access_key_id,
+    aws_secret_access_key=settings.aws_secret_access_key,
+    region_name=settings.aws_region,
+    endpoint_url=settings.s3_endpoint_url,
 )

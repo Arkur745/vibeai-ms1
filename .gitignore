@@ -1,60 +1,78 @@
-# Python
+# ─── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
+*.pyo
+*.pyd
+.Python
 
-# Virtual Environment
+# ─── Virtual Environments ────────────────────────────────────────────────────
 aimlenv/
 venv/
+.venv/
+env/
+ENV/
 
-# Jupyter
+# ─── Distribution / Packaging ────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
+
+# ─── Testing & Coverage ──────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.junit.xml
+
+# ─── Jupyter ─────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
+*.ipynb
 
-# MLflow
+# ─── Environment & Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+/configs
+
+# ─── MLflow ──────────────────────────────────────────────────────────────────
 mlruns/
+mlartifacts/
 *.db
 
-# VSCode
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# DVC tracked raw datasets
-data/raw/
-
-# Generated feature datasets
-data/features/
-
-# DVC cache
+# ─── DVC ─────────────────────────────────────────────────────────────────────
 .dvc/cache/
+.dvc/tmp/
 
-# Environment variables
-.env
-/configs
-# Data
+# ─── Data (DVC-tracked) ──────────────────────────────────────────────────────
 data/raw/
 data/spectrograms/
 data/features/
 data/processed/
 
-# Models
+# ─── Models ──────────────────────────────────────────────────────────────────
 models/*.pth
 models/*.pkl
+models/*.onnx
+models/*.bin
+artifacts/
 
-# Uploads
+# ─── Temp uploads (runtime) ──────────────────────────────────────────────────
 temp_uploads/
 
-# MLflow
-mlruns/
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
 
-# Python
-__pycache__/
-*.pyc
+# ─── Docker ──────────────────────────────────────────────────────────────────
+.docker/
 
-# Jupyter
-.ipynb_checkpoints/
-
-# OS
+# ─── OS / Editor ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+*.pem

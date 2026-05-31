@@ -1,74 +1,104 @@
+import json
+import time
 from pathlib import Path
-import uuid
-import traceback
 
+from app.core.config import settings
+from app.core.logger import logger
+from app.observability.metrics import TOTAL_TASK_DURATION_SECONDS
+from app.persistence.db import save_inference_task
+from app.services.inference_service import run_inference
 from app.workers.celery_app import celery
 
-from app.ml.inference import predict_emotion
 
-from app.core.storage import (
-    download_file_from_s3
+@celery.task(
+    bind=True,
+    name="app.workers.tasks.process_audio_task",
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 2},
+    default_retry_delay=60,
 )
+def process_audio_task(self, task_id: str):
+    task_start = time.time()
+    temp_dir = Path(settings.temp_upload_dir)
 
-from app.core.config import (
-    TEMP_UPLOAD_DIR
-)
-
-
-@celery.task
-def process_audio_task(s3_key):
+    logger.info(f"Task {task_id} STARTED | Local processing")
 
     try:
+        local_filename = f"{task_id}.mp3"
+        local_path = temp_dir / local_filename
 
-        print("\n====================")
-        print("TASK STARTED")
-        print("====================")
+        if not local_path.exists():
+            raise FileNotFoundError(f"Uploaded file not found locally: {local_path}")
 
-        print(f"S3 Key: {s3_key}")
+        logger.info(f"Processing audio from local path: {local_path}")
+        prediction = run_inference(local_path, task_id=task_id)
 
-        # ---------------------------------
-        # Download Audio Locally
-        # ---------------------------------
+        gradcam_local_path = prediction.pop("gradcam_path", None)
+        gradcam_url = ""
+        if gradcam_local_path and Path(gradcam_local_path).exists():
+            gradcam_filename = Path(gradcam_local_path).name
+            # Construct the static artifact URL served directly by FastAPI
+            gradcam_url = f"{settings.api_base_url}/artifacts/gradcam/{gradcam_filename}"
+            prediction["gradcam_url"] = gradcam_url
+            logger.info(f"GradCAM local artifact verified at: {gradcam_local_path} | URL: {gradcam_url}")
+        else:
+            logger.warning(f"GradCAM local path is empty or does not exist for task {task_id}")
 
-        local_filename = f"{uuid.uuid4()}.mp3"
+        total_duration = time.time() - task_start
+        TOTAL_TASK_DURATION_SECONDS.observe(total_duration)
 
-        local_path = (
-            TEMP_UPLOAD_DIR / local_filename
+        # Retrieve and preserve original filename from database
+        original_filename = local_filename
+        try:
+            from app.persistence.db import get_inference_task
+            existing_task = get_inference_task(task_id)
+            if existing_task and existing_task.get("filename"):
+                original_filename = existing_task["filename"]
+        except Exception as db_err:
+            logger.error(f"Failed to fetch original filename for task {task_id}: {db_err}")
+
+        save_inference_task(
+            task_id=task_id,
+            filename=original_filename,
+            s3_key="",  # No S3 usage
+            predictions=prediction,
+            gradcam_url=gradcam_url,
+            duration=total_duration,
+            status="success",
+            benchmark=prediction.get("benchmark", {}),
+            model_version=prediction.get(
+                "model_info", {}).get("genre_model_version"),
+            model_architecture=prediction.get(
+                "model_info", {}).get("genre_model_architecture"),
+            model_checkpoint_hash=prediction.get(
+                "model_info", {}).get("genre_model_checkpoint_hash"),
+            model_training_timestamp=prediction.get(
+                "model_info", {}).get("genre_model_training_timestamp"),
+            gpu_info=prediction.get("gpu_info", {}),
         )
 
-        download_file_from_s3(
-            s3_key,
-            local_path
+        logger.info(
+            f"Task {task_id} SUCCESS | duration={total_duration:.2f}s | gradcam_url={gradcam_url}"
         )
-
-        print(f"Downloaded: {local_path}")
-
-        # ---------------------------------
-        # Run Inference
-        # ---------------------------------
-
-        prediction = predict_emotion(
-            local_path
-        )
-
-        print("\nPrediction Success")
-        print(prediction)
-
-        # ---------------------------------
-        # Cleanup Local Temp File
-        # ---------------------------------
-
-        local_path.unlink(
-            missing_ok=True
-        )
-
         return prediction
+    except Exception as exc:
+        logger.error(f"Task {task_id} FAILED: {exc}", exc_info=True)
+        original_filename = f"{task_id}.mp3"
+        try:
+            from app.persistence.db import get_inference_task
+            existing_task = get_inference_task(task_id)
+            if existing_task and existing_task.get("filename"):
+                original_filename = existing_task["filename"]
+        except Exception:
+            pass
 
-    except Exception as e:
-
-        print("\nTASK FAILED")
-        print(str(e))
-
-        traceback.print_exc()
-
-        raise e
+        save_inference_task(
+            task_id=task_id,
+            filename=original_filename,
+            s3_key="",
+            predictions={},
+            gradcam_url="",
+            duration=time.time() - task_start,
+            status="failed",
+        )
+        raise
