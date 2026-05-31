@@ -41,6 +41,7 @@ services:
       - DEBUG=False
       - JSON_LOGS=True
       - LOG_LEVEL=INFO
+      - API_BASE_URL=https://museark.duckdns.org
     volumes:
       - vibeai_temp_uploads:/app/temp_uploads
       - vibeai_models:/app/models
@@ -77,6 +78,7 @@ services:
       - DEBUG=False
       - JSON_LOGS=True
       - LOG_LEVEL=INFO
+      - API_BASE_URL=https://museark.duckdns.org
     volumes:
       - vibeai_temp_uploads:/app/temp_uploads
       - vibeai_models:/app/models
