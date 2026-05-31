@@ -1,0 +1,25 @@
+moods:
+
+  energetic:
+    valence_min: 5
+    arousal_min: 5
+    mood: "Energetic"
+    vibe: "Upbeat, powerful, exciting"
+
+  chill:
+    valence_min: 5
+    arousal_max: 5
+    mood: "Chill"
+    vibe: "Calm, relaxed, peaceful"
+
+  aggressive:
+    valence_max: 5
+    arousal_min: 5
+    mood: "Aggressive"
+    vibe: "Dark, tense, intense"
+
+  melancholic:
+    valence_max: 5
+    arousal_max: 5
+    mood: "Melancholic"
+    vibe: "Sad, emotional, reflective"
