@@ -15,7 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Install dependencies into a wheels directory
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir --user -r requirements.txt
 
 # ==========================================
 # STAGE 2: Runner (Production App Image)
